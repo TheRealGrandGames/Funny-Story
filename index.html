@@ -1,0 +1,1136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Funny Story</title>
+    <!-- Tailwind CSS CDN for easy styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Firebase SDKs -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, getDoc, addDoc, setDoc, updateDoc, deleteDoc, onSnapshot, collection, query, where, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Global Firebase variables - MUST BE USED
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+
+        let app;
+        let db;
+        let auth;
+        let userId = null; // Will be set after authentication
+
+        // Predefined options (can be extended)
+        const predefinedOptions = {
+            characters: [
+                "Baldi", "Principal of the Thing", "It's a Bully", "Arts and Crafters", "Beans", "Mrs. Pomp", "The Test", "Dr. Reflex",
+                "Mario", "Luigi", "Yoshi", "Princess Peach", "Princess Daisy", "Princess Rosalina",
+                "Bowser", "Sonic", "Amy", "Knuckles", "Tails", "Frisk", "Flowey", "Toriel", "Sans",
+                "Papyrus", "Undyne", "Alphys", "Asgore Dreemurr", "Kris", "Susie", "Ralsei", "Jevil",
+                "Spamton G. Spamton", "Pikachu", "Charmander", "SpongeBob", "Patrick", "Squidward", "Mr. Krabs", "Bubble Bass", "Plankton", "Karen", "Pearl", "Mrs. Puff", "Mermaid Man", "Barnacle Boy",
+                "Darth Vader",
+                "Yoda", "Gandalf", "Harry Potter", "Taylor Swift", "Shrek", "Donkey", "Fiona", "Goku",
+                "Elsa", "Anna", "Olaf", "Spider-Man", "Batman", "Superman", "Wonder Woman", "Groot",
+                "Sherlock Holmes", "Scooby Doo", "Shaggy", "Homer Simpson", "Marge Simpson", "Bart Simpson",
+                "Lisa Simpson", "Maggie Simpson", "Abraham Simpson", "Peter Griffin", "Glenn Quagmire",
+                "Bugs Bunny", "Daffy Duck", "Tweety Bird", "Sylvester the Cat", "Wile E. Coyote", "Road Runner"
+            ],
+            actions: [
+                "eating", "holding", "observing", "using", "feeling", "tasting", "seeing", "hearing",
+                "punching", "slapping", "touching", "wearing", "serving", "finding", "smelling", "watching",
+                "noticing", "lifting", "pushing", "pulling", "carrying", "dropping", "picking up", "placing",
+                "breaking", "squeezing", "stroking", "adjusting", "arranging", "grabbing", "releasing",
+                "writing", "drawing", "answering", "imagining", "remembering"
+            ],
+            objects: [
+                "an old shoe", "a new shoe", "a water bottle", "a condom", "an owl", "a boy", "a girl",
+                "a child", "a dog", "a cat", "a rubber duck", "a cloud", "a pineapple", "a clock", "a sword", "a key",
+                "seeds", "a book", "a chair", "a table", "a lamp", "a phone", "a wallet", "a backpack",
+                "an umbrella", "a camera", "a guitar", "a bicycle", "a car", "a hat", "a pair of glasses",
+                "a pair of pants", "a t-shirt", "cheese", "a hamburger", "a cheeseburger", "a Big Mac", "a Whopper", "a Krabby Patty",
+                "a comb", "money", "grapes"
+            ],
+            locations: [
+                "Your Grandmother's House", "The Underworld", "A Hole", "Denver, Colorado", "Dallas, Texas",
+                "Miami, Florida", "New Jersey", "Europe", "Jolly Old England", "New York City", "Paris, France",
+                "Tokyo, Japan", "The Sahara Desert", "Mount Everest", "The Great Barrier Reef", "The Moon",
+                "Mars", "The International Space Station", "London, England", "Rome, Italy", "Sydney, Australia",
+                "Cairo, Egypt", "Rio de Janeiro, Brazil", "Beijing, China", "Moscow, Russia", "Berlin, Germany",
+                "Cape Town, South Africa", "Dubai, UAE", "a haunted mansion", "a bustling marketplace",
+                "the bottom of the ocean", "a tea party", "a spaceship", "a birthday party", "the Krusty Krab"
+            ],
+            consequences: [
+                "This caused a minor explosion of glitter.",
+                "Everyone around them burst into spontaneous applause.",
+                "A flock of pigeons immediately started singing opera.",
+                "The sky turned plaid for a brief moment.",
+                "They suddenly realized they were floating upside down.",
+                "All the nearby streetlights began to disco.",
+                "Their socks mysteriously vanished.",
+                "An invisible orchestra began to play.",
+                "The ground beneath them turned into jelly.",
+                "They received an urgent message from a talking squirrel.",
+                "Time itself seemed to hiccup and skip a beat.",
+                "A group rubber ducks floated by.",
+                "They spontaneously started tap-dancing.",
+                "Their voice turned into a kazoo sound.",
+                "A portal to a dimension of sentient cheese opened.",
+                "They were bald with no hair shortly after.",
+                "They flew to a nearby house.", /* Added comma here */
+                "They, shortly after, fell into the underworld."
+            ],
+            partTypes: [
+                "First, ", "Next, ", "After, ", "Last, ", "Finally, "
+            ]
+        };
+
+        // Function to load options (currently uses predefined, but can be extended for user-added)
+        function loadOptions(category) {
+            return predefinedOptions[category];
+        }
+
+        // Helper function to get random element
+        function getRandomElement(array) {
+            return array[Math.floor(Math.random() * array.length)];
+        }
+
+        // Initialize Firebase and authenticate
+        window.onload = async function () {
+            try {
+                app = initializeApp(firebaseConfig);
+                db = getFirestore(app);
+                auth = getAuth(app);
+
+                // Authenticate user
+                if (initialAuthToken) {
+                    await signInWithCustomToken(auth, initialAuthToken);
+                } else {
+                    await signInAnonymously(auth);
+                }
+
+                // Get references to the select elements for the main story
+                const characterSelect = document.getElementById('characterSelect');
+                const actionSelect = document.getElementById('actionSelect');
+                const objectSelect = document.getElementById('objectSelect');
+                const locationSelect = document.getElementById('locationSelect');
+                const consequenceToggle = document.getElementById('consequenceToggle');
+                const consequenceSelect = document.getElementById('consequenceSelect');
+                const consequenceSelectContainer = document.getElementById('consequenceSelectContainer');
+
+                // Get references to the new randomize checkboxes
+                const randomizeCharacter = document.getElementById('randomizeCharacter');
+                const randomizeAction = document.getElementById('randomizeAction');
+                const randomizeObject = document.getElementById('randomizeObject');
+                const randomizeLocation = document.getElementById('randomizeLocation');
+                const randomizeConsequence = document.getElementById('randomizeConsequence');
+
+                // Get references to the new All On/All Off buttons
+                const allOnBtn = document.getElementById('allOnBtn');
+                const allOffBtn = document.getElementById('allOffBtn');
+
+                // Get references to the main buttons and story output area
+                const randomizeBtn = document.getElementById('randomizeBtn');
+                const copyStoryBtn = document.getElementById('copyStoryBtn');
+                const saveStoryBtn = document.getElementById('saveStoryBtn');
+                const storyOutput = document.getElementById('storyOutput');
+                const savedStoriesContainer = document.getElementById('savedStoriesContainer');
+                const noSavedStoriesMessage = document.getElementById('noSavedStoriesMessage');
+                const themeSwitcher = document.getElementById('themeSwitcher');
+                const bodyElement = document.body;
+                const addPartBtn = document.getElementById('addPartBtn');
+                const additionalPartsContainer = document.getElementById('additionalPartsContainer');
+
+                // Array to hold data for dynamically added story parts
+                let additionalStoryParts = [];
+                let partCounter = 0; // To assign unique IDs to parts
+
+                // Function to populate select elements
+                function populateSelect(selectElement, optionsArray) {
+                    selectElement.innerHTML = '';
+                    optionsArray.forEach(option => {
+                        const opt = document.createElement('option');
+                        opt.value = option;
+                        opt.textContent = option;
+                        selectElement.appendChild(opt);
+                    });
+                }
+
+                /**
+                 * Generates and displays a funny story based on the selected dropdown values with animation,
+                 * now including dynamically added parts.
+                 */
+                function generateStory() {
+                    // Fade out the current story
+                    storyOutput.classList.add('story-fade-out');
+
+                    setTimeout(() => {
+                        let fullStory = "";
+
+                        // Main story part
+                        const mainCharacter = characterSelect.value;
+                        const mainAction = actionSelect.value;
+                        const mainObject = objectSelect.value;
+                        const mainLocation = locationSelect.value;
+                        let mainConsequenceText = "";
+
+                        if (consequenceToggle.checked) {
+                            mainConsequenceText = ` ${consequenceSelect.value}`;
+                        }
+                        fullStory += `${mainCharacter} was ${mainAction} ${mainObject} in ${mainLocation}.${mainConsequenceText}`;
+
+                        // Add dynamically generated parts
+                        additionalStoryParts.forEach(part => {
+                            const partCharacter = part.character;
+                            const partAction = part.action;
+                            const partObject = part.object;
+                            const partLocation = part.location;
+                            const partType = part.partType;
+                            let partConsequenceText = "";
+
+                            if (part.consequenceEnabled) {
+                                partConsequenceText = ` ${part.consequence}`;
+                            }
+                            fullStory += ` ${partType}${partCharacter} was ${partAction} ${partObject} in ${partLocation}.${partConsequenceText}`;
+                        });
+
+                        storyOutput.textContent = fullStory;
+
+                        // Fade in the new story
+                        storyOutput.classList.remove('story-fade-out');
+                        storyOutput.classList.add('story-fade-in'); // Ensure it fades in
+                    }, 300); // Wait for fade-out to complete (0.3s transition)
+                }
+
+                /**
+                 * Randomly selects an option for each dropdown based on checkbox selection,
+                 * including dynamically added parts.
+                 */
+                function randomizeValues() {
+                    let anyCheckboxChecked = false;
+
+                    // Check if any checkbox is checked
+                    if (randomizeCharacter.checked || randomizeAction.checked || randomizeObject.checked || randomizeLocation.checked || randomizeConsequence.checked) {
+                        anyCheckboxChecked = true;
+                    }
+
+                    // If no checkboxes are checked, randomize all by default
+                    if (!anyCheckboxChecked) {
+                        randomizeCharacter.checked = true;
+                        randomizeAction.checked = true;
+                        randomizeObject.checked = true;
+                        randomizeLocation.checked = true;
+                        randomizeConsequence.checked = true;
+                    }
+
+                    if (randomizeCharacter.checked) {
+                        characterSelect.value = getRandomElement(loadOptions('characters'));
+                    }
+                    if (randomizeAction.checked) {
+                        actionSelect.value = getRandomElement(loadOptions('actions'));
+                    }
+                    if (randomizeObject.checked) {
+                        objectSelect.value = getRandomElement(loadOptions('objects'));
+                    }
+                    if (randomizeLocation.checked) {
+                        locationSelect.value = getRandomElement(loadOptions('locations'));
+                    }
+                    // Only randomize main consequence if its toggle is checked AND its randomize checkbox is checked
+                    if (consequenceToggle.checked && randomizeConsequence.checked) {
+                        consequenceSelect.value = getRandomElement(loadOptions('consequences'));
+                    }
+
+                    // Randomize values for all additional parts
+                    additionalStoryParts.forEach(part => {
+                        if (randomizeCharacter.checked) part.character = getRandomElement(loadOptions('characters'));
+                        if (randomizeAction.checked) part.action = getRandomElement(loadOptions('actions'));
+                        if (randomizeObject.checked) part.object = getRandomElement(loadOptions('objects'));
+                        if (randomizeLocation.checked) part.location = getRandomElement(loadOptions('locations'));
+                        if (randomizeConsequence.checked && part.consequenceEnabled) part.consequence = getRandomElement(loadOptions('consequences'));
+                        part.partType = getRandomElement(loadOptions('partTypes')); // Always randomize part type
+
+                        // Update the actual select elements in the DOM for the part
+                        const partElement = document.querySelector(`.dynamic-part-card[data-part-id="${part.id}"]`);
+                        if (partElement) {
+                            partElement.querySelector('.part-type-select').value = part.partType;
+                            partElement.querySelector('.part-character-select').value = part.character;
+                            partElement.querySelector('.part-action-select').value = part.action;
+                            partElement.querySelector('.part-object-select').value = part.object;
+                            partElement.querySelector('.part-location-select').value = part.location;
+                            if (part.consequenceEnabled) {
+                                partElement.querySelector('.part-consequence-select').value = part.consequence;
+                            }
+                        }
+                    });
+
+                    generateStory(); // Generate story immediately after randomizing
+                }
+
+                /**
+                 * Displays a temporary "Copied to clipboard" message.
+                 */
+                function showCopiedMessage() {
+                    // Remove any existing message to prevent duplicates
+                    const existingMessage = document.getElementById('copiedMessage');
+                    if (existingMessage) {
+                        existingMessage.remove();
+                    }
+
+                    const messageBox = document.createElement('div');
+                    messageBox.id = 'copiedMessage';
+                    messageBox.className = 'fixed bottom-4 left-4 bg-green-600 text-white py-2 px-4 rounded-lg shadow-lg flex items-center space-x-2 opacity-0 copied-message z-50';
+                    messageBox.innerHTML = `
+                        <span class="text-xl">&#10003;</span> <!-- Green check mark emoji -->
+                        <span>Copied sentence to clipboard.</span>
+                    `;
+                    document.body.appendChild(messageBox);
+
+                    // Trigger fade-in
+                    setTimeout(() => {
+                        messageBox.classList.remove('opacity-0');
+                        messageBox.classList.add('opacity-100');
+                    }, 10); // Small delay to ensure transition applies
+
+                    // Trigger fade-out and removal
+                    setTimeout(() => {
+                        messageBox.classList.remove('opacity-100');
+                        messageBox.classList.add('opacity-0');
+                        setTimeout(() => {
+                            messageBox.remove();
+                        }, 500); // Wait for fade-out transition to complete before removing
+                    }, 2000); // Message visible for 2 seconds
+                }
+
+                /**
+                 * Copies the current story text to the clipboard and shows a message.
+                 */
+                function copyStoryToClipboard() {
+                    const textToCopy = storyOutput.textContent;
+                    if (textToCopy) {
+                        // Create a temporary textarea element
+                        const tempTextArea = document.createElement('textarea');
+                        tempTextArea.value = textToCopy;
+                        document.body.appendChild(tempTextArea);
+
+                        // Select the text and copy it
+                        tempTextArea.select();
+                        document.execCommand('copy');
+
+                        // Remove the temporary textarea
+                        document.body.removeChild(tempTextArea);
+
+                        // Show the copied message
+                        showCopiedMessage();
+                    }
+                }
+
+                /**
+                 * Saves the current story to Firestore.
+                 */
+                async function saveCurrentStory() {
+                    if (!db || !userId) {
+                        console.error("Firestore not initialized or user not authenticated.");
+                        return;
+                    }
+
+                    try {
+                        const storiesCollectionRef = collection(db, `artifacts/${appId}/users/${userId}/stories`);
+                        const storyData = {
+                            character: characterSelect.value,
+                            action: actionSelect.value,
+                            object: objectSelect.value,
+                            location: locationSelect.value,
+                            consequenceEnabled: consequenceToggle.checked,
+                            consequence: consequenceSelect.value,
+                            storyText: storyOutput.textContent,
+                            additionalParts: additionalStoryParts.map(part => ({ // Store only necessary data
+                                id: part.id, // Keep ID for potential future reference
+                                partType: part.partType,
+                                character: part.character,
+                                action: part.action,
+                                object: part.object,
+                                location: part.location,
+                                consequenceEnabled: part.consequenceEnabled,
+                                consequence: part.consequence
+                            })),
+                            timestamp: new Date().toISOString()
+                        };
+                        await addDoc(storiesCollectionRef, storyData);
+                        console.log("Story saved to Firestore!");
+                        renderSavedStories(); // Re-render to show the new story
+                    } catch (error) {
+                        console.error("Error saving story:", error);
+                    }
+                }
+
+                /**
+                 * Loads a saved story from Firestore into the dropdowns and story output.
+                 * @param {string} docId - The Firestore document ID of the story to load.
+                 */
+                async function loadStory(docId) {
+                    if (!db || !userId) {
+                        console.error("Firestore not initialized or user not authenticated.");
+                        return;
+                    }
+
+                    try {
+                        const storyDocRef = doc(db, `artifacts/${appId}/users/${userId}/stories`, docId);
+                        const docSnap = await getDoc(storyDocRef);
+
+                        if (docSnap.exists()) {
+                            const storyToLoad = docSnap.data();
+
+                            // Load main story part
+                            characterSelect.value = storyToLoad.character;
+                            actionSelect.value = storyToLoad.action;
+                            objectSelect.value = storyToLoad.object;
+                            locationSelect.value = storyToLoad.location;
+                            consequenceToggle.checked = storyToLoad.consequenceEnabled || false;
+                            toggleConsequenceDropdown();
+                            consequenceSelect.value = storyToLoad.consequence || predefinedOptions.consequences[0];
+
+                            // Clear existing additional parts and load new ones
+                            additionalStoryParts = [];
+                            additionalPartsContainer.innerHTML = ''; // Clear DOM
+                            storyToLoad.additionalParts.forEach(partData => {
+                                addPart(partData); // Recreate part with loaded data
+                            });
+
+                            // Trigger animation for story output when loading
+                            storyOutput.classList.add('story-fade-out');
+                            setTimeout(() => {
+                                storyOutput.textContent = storyToLoad.storyText;
+                                storyOutput.classList.remove('story-fade-out');
+                                storyOutput.classList.add('story-fade-in');
+                            }, 300);
+                        } else {
+                            console.log("No such document!");
+                        }
+                    } catch (error) {
+                        console.error("Error loading story:", error);
+                    }
+                }
+
+                /**
+                 * Deletes a saved story from Firestore.
+                 * @param {string} docId - The Firestore document ID of the story to delete.
+                 */
+                async function deleteStory(docId) {
+                    if (!db || !userId) {
+                        console.error("Firestore not initialized or user not authenticated.");
+                        return;
+                    }
+
+                    try {
+                        const storyDocRef = doc(db, `artifacts/${appId}/users/${userId}/stories`, docId);
+                        await deleteDoc(storyDocRef);
+                        console.log("Story successfully deleted!");
+                        renderSavedStories(); // Re-render to reflect deletion
+                    } catch (error) {
+                        console.error("Error deleting story:", error);
+                    }
+                }
+
+                /**
+                 * Renders all saved stories in the savedStoriesContainer from Firestore.
+                 */
+                async function renderSavedStories() {
+                    if (!db || !userId) {
+                        console.warn("Firestore not ready for rendering saved stories.");
+                        return;
+                    }
+
+                    savedStoriesContainer.innerHTML = ''; // Clear existing display
+                    try {
+                        const storiesCollectionRef = collection(db, `artifacts/${appId}/users/${userId}/stories`);
+                        const q = query(storiesCollectionRef); // No orderBy to avoid index issues
+
+                        // Use onSnapshot for real-time updates
+                        onSnapshot(q, (snapshot) => {
+                            savedStoriesContainer.innerHTML = ''; // Clear again on update
+                            if (snapshot.empty) {
+                                noSavedStoriesMessage.style.display = 'block';
+                                savedStoriesContainer.appendChild(noSavedStoriesMessage);
+                            } else {
+                                noSavedStoriesMessage.style.display = 'none';
+                                snapshot.docs.forEach(docSnap => {
+                                    const story = docSnap.data();
+                                    const docId = docSnap.id; // Get the document ID
+
+                                    const storyDiv = document.createElement('div');
+                                    storyDiv.className = 'bg-white p-4 rounded-lg shadow mb-3 flex flex-col sm:flex-row justify-between items-center';
+                                    storyDiv.innerHTML = `
+                                        <p class="text-gray-700 text-sm mb-2 sm:mb-0 sm:mr-4 flex-grow text-left">${story.storyText}</p>
+                                        <div class="flex space-x-2">
+                                            <button class="load-story-btn bg-blue-500 hover:bg-blue-600 text-white text-xs px-3 py-1 rounded-full transition-colors duration-200" data-doc-id="${docId}">Load</button>
+                                            <button class="delete-story-btn bg-red-500 hover:bg-red-600 text-white text-xs px-3 py-1 rounded-full transition-colors duration-200" data-doc-id="${docId}">Delete</button>
+                                        </div>
+                                    `;
+                                    savedStoriesContainer.appendChild(storyDiv);
+                                });
+
+                                // Add event listeners to the dynamically created buttons
+                                savedStoriesContainer.querySelectorAll('.load-story-btn').forEach(button => {
+                                    button.addEventListener('click', (event) => {
+                                        loadStory(event.target.dataset.docId);
+                                    });
+                                });
+                                savedStoriesContainer.querySelectorAll('.delete-story-btn').forEach(button => {
+                                    button.addEventListener('click', (event) => {
+                                        deleteStory(event.target.dataset.docId);
+                                    });
+                                });
+                            }
+                        });
+                    } catch (error) {
+                        console.error("Error rendering saved stories:", error);
+                        noSavedStoriesMessage.textContent = "Error loading saved stories.";
+                        noSavedStoriesMessage.style.display = 'block';
+                    }
+                }
+
+                /**
+                 * Adds a new dynamic story part to the UI and the additionalStoryParts array.
+                 * @param {Object} [initialData] - Optional initial data to populate the new part from (e.g., when loading a saved story).
+                 */
+                function addPart(initialData = {}) {
+                    partCounter++;
+                    const partId = `part-${Date.now()}-${partCounter}`; // Unique ID for the part
+
+                    const partDiv = document.createElement('div');
+                    partDiv.className = 'dynamic-part-card p-6 rounded-xl shadow-lg bg-white border border-gray-200';
+                    partDiv.dataset.partId = partId;
+
+                    partDiv.innerHTML = `
+                        <div class="flex justify-between items-center mb-4 cursor-pointer" data-toggle-id="${partId}">
+                            <h3 class="text-2xl font-bold text-gray-700">Part <span class="part-number">${additionalStoryParts.length + 1}</span></h3>
+                            <div class="flex items-center space-x-2">
+                                <button class="toggle-part-btn text-gray-500 hover:text-gray-700 text-2xl transition-transform duration-300">&#9660;</button> <!-- Down arrow -->
+                                <button class="delete-part-btn bg-red-500 hover:bg-red-600 text-white text-xs px-3 py-1 rounded-full transition-colors duration-200">Delete</button>
+                            </div>
+                        </div>
+                        <div class="part-content"> <!-- Collapsible content -->
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <!-- Part Type Select -->
+                                <div class="col-span-1 md:col-span-2 mb-4">
+                                    <label class="block text-gray-700 text-sm font-bold mb-2">Part Type:</label>
+                                    <select class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-transparent outline-none part-type-select">
+                                        <!-- Options will be populated by JavaScript -->
+                                    </select>
+                                </div>
+                                <!-- Character Card (simplified for dynamic part) -->
+                                <div>
+                                    <label class="block text-gray-700 text-sm font-bold mb-2">Character:</label>
+                                    <select class="w-full p-3 border border-blue-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none part-character-select">
+                                        <!-- Options populated by JS -->
+                                    </select>
+                                </div>
+                                <!-- Action Card -->
+                                <div>
+                                    <label class="block text-gray-700 text-sm font-bold mb-2">Action:</label>
+                                    <select class="w-full p-3 border border-purple-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none part-action-select">
+                                        <!-- Options populated by JS -->
+                                    </select>
+                                </div>
+                                <!-- Object Card -->
+                                <div>
+                                    <label class="block text-gray-700 text-sm font-bold mb-2">Object:</label>
+                                    <select class="w-full p-3 border border-green-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none part-object-select">
+                                        <!-- Options populated by JS -->
+                                    </select>
+                                </div>
+                                <!-- Location Card -->
+                                <div>
+                                    <label class="block text-gray-700 text-sm font-bold mb-2">Location:</label>
+                                    <select class="w-full p-3 border border-yellow-300 rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-transparent outline-none part-location-select">
+                                        <!-- Options populated by JS -->
+                                    </select>
+                                </div>
+                                <!-- Consequence Toggle and Select for Part -->
+                                <div class="col-span-1 md:col-span-2">
+                                    <div class="flex items-center mb-2">
+                                        <input type="checkbox" class="mr-2 h-5 w-5 text-rose-600 rounded focus:ring-rose-500 part-consequence-toggle">
+                                        <label class="text-gray-700 font-medium">Enable Consequence</label>
+                                    </div>
+                                    <div class="part-consequence-select-container">
+                                        <select class="w-full p-3 border border-rose-300 rounded-lg focus:ring-2 focus:ring-rose-500 focus:border-transparent outline-none part-consequence-select" disabled>
+                                            <!-- Options populated by JS -->
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                    additionalPartsContainer.appendChild(partDiv);
+
+                    // Get references to elements within the new part
+                    const partTypeSelect = partDiv.querySelector('.part-type-select');
+                    const partCharacterSelect = partDiv.querySelector('.part-character-select');
+                    const partActionSelect = partDiv.querySelector('.part-action-select');
+                    const partObjectSelect = partDiv.querySelector('.part-object-select');
+                    const partLocationSelect = partDiv.querySelector('.part-location-select');
+                    const partConsequenceToggle = partDiv.querySelector('.part-consequence-toggle');
+                    const partConsequenceSelect = partDiv.querySelector('.part-consequence-select');
+                    const partConsequenceSelectContainer = partDiv.querySelector('.part-consequence-select-container');
+                    const deletePartBtn = partDiv.querySelector('.delete-part-btn');
+                    const togglePartBtn = partDiv.querySelector('.toggle-part-btn');
+                    const partContent = partDiv.querySelector('.part-content');
+                    const partHeader = partDiv.querySelector('[data-toggle-id]');
+
+
+                    // Populate dropdowns for the new part
+                    populateSelect(partTypeSelect, loadOptions('partTypes'));
+                    populateSelect(partCharacterSelect, loadOptions('characters'));
+                    populateSelect(partActionSelect, loadOptions('actions'));
+                    populateSelect(partObjectSelect, loadOptions('objects'));
+                    populateSelect(partLocationSelect, loadOptions('locations'));
+                    populateSelect(partConsequenceSelect, loadOptions('consequences'));
+
+                    // Create a data object for the new part and add to array
+                    const newPartData = {
+                        id: partId,
+                        partType: initialData.partType || partTypeSelect.value,
+                        character: initialData.character || partCharacterSelect.value,
+                        action: initialData.action || partActionSelect.value,
+                        object: initialData.object || partObjectSelect.value,
+                        location: initialData.location || partLocationSelect.value,
+                        consequenceEnabled: initialData.consequenceEnabled || false,
+                        consequence: initialData.consequence || partConsequenceSelect.value
+                    };
+                    additionalStoryParts.push(newPartData);
+
+                    // Set initial values if loading from initialData
+                    partTypeSelect.value = newPartData.partType;
+                    partCharacterSelect.value = newPartData.character;
+                    partActionSelect.value = newPartData.action;
+                    partObjectSelect.value = newPartData.object;
+                    partLocationSelect.value = newPartData.location;
+                    partConsequenceToggle.checked = newPartData.consequenceEnabled;
+                    partConsequenceSelect.value = newPartData.consequence;
+
+                    // Toggle consequence dropdown for this specific part
+                    const togglePartConsequenceDropdown = () => {
+                        partConsequenceSelect.disabled = !partConsequenceToggle.checked;
+                        partConsequenceSelectContainer.classList.toggle('hidden', !partConsequenceToggle.checked);
+                        // Update data model when toggle changes
+                        const partIndex = additionalStoryParts.findIndex(p => p.id === partId);
+                        if (partIndex !== -1) {
+                            additionalStoryParts[partIndex].consequenceEnabled = partConsequenceToggle.checked;
+                        }
+                        generateStory();
+                    };
+                    togglePartConsequenceDropdown(); // Apply initial state
+
+                    // Automatically expand the new part
+                    partContent.classList.add('expanded');
+                    togglePartBtn.classList.add('rotated');
+
+                    // Event listeners for the new part's elements
+                    partTypeSelect.addEventListener('change', () => {
+                        const partIndex = additionalStoryParts.findIndex(p => p.id === partId);
+                        if (partIndex !== -1) additionalStoryParts[partIndex].partType = partTypeSelect.value;
+                        generateStory();
+                    });
+                    partCharacterSelect.addEventListener('change', () => {
+                        const partIndex = additionalStoryParts.findIndex(p => p.id === partId);
+                        if (partIndex !== -1) additionalStoryParts[partIndex].character = partCharacterSelect.value;
+                        generateStory();
+                    });
+                    partActionSelect.addEventListener('change', () => {
+                        const partIndex = additionalStoryParts.findIndex(p => p.id === partId);
+                        if (partIndex !== -1) additionalStoryParts[partIndex].action = partActionSelect.value;
+                        generateStory();
+                    });
+                    partObjectSelect.addEventListener('change', () => {
+                        const partIndex = additionalStoryParts.findIndex(p => p.id === partId);
+                        if (partIndex !== -1) additionalStoryParts[partIndex].object = partObjectSelect.value;
+                        generateStory();
+                    });
+                    partLocationSelect.addEventListener('change', () => {
+                        const partIndex = additionalStoryParts.findIndex(p => p.id === partId);
+                        if (partIndex !== -1) additionalStoryParts[partIndex].location = partLocationSelect.value;
+                        generateStory();
+                    });
+                    partConsequenceToggle.addEventListener('change', togglePartConsequenceDropdown);
+                    partConsequenceSelect.addEventListener('change', () => {
+                        const partIndex = additionalStoryParts.findIndex(p => p.id === partId);
+                        if (partIndex !== -1) additionalStoryParts[partIndex].consequence = partConsequenceSelect.value;
+                        generateStory();
+                    });
+
+                    deletePartBtn.addEventListener('click', () => deletePart(partId));
+
+                    // Collapsible logic
+                    partHeader.addEventListener('click', () => {
+                        partContent.classList.toggle('expanded');
+                        togglePartBtn.classList.toggle('rotated');
+                    });
+
+                    // Ensure part number is updated if parts are deleted/re-added
+                    updatePartNumbers();
+                }
+
+                /**
+                 * Deletes a dynamic story part from the UI and the additionalStoryParts array.
+                 * @param {string} partId - The unique ID of the part to delete.
+                 */
+                function deletePart(partId) {
+                    // Remove from data array
+                    additionalStoryParts = additionalStoryParts.filter(part => part.id !== partId);
+
+                    // Remove from DOM
+                    const partElement = document.querySelector(`.dynamic-part-card[data-part-id="${partId}"]`);
+                    if (partElement) {
+                        partElement.remove();
+                    }
+                    updatePartNumbers(); // Update numbers after deletion
+                    generateStory(); // Regenerate story
+                }
+
+                /**
+                 * Updates the "Part X" numbers displayed on each dynamic part card.
+                 */
+                function updatePartNumbers() {
+                    const partNumberElements = additionalPartsContainer.querySelectorAll('.part-number');
+                    partNumberElements.forEach((el, index) => {
+                        el.textContent = index + 1;
+                    });
+                }
+
+                /**
+                 * Applies the selected theme to the body.
+                 * @param {string} themeName - The name of the theme ('default' or 'dark').
+                 */
+                function applyTheme(themeName) {
+                    // Remove all theme classes first
+                    bodyElement.classList.remove('theme-default', 'theme-dark');
+                    // Add the selected theme class
+                    bodyElement.classList.add(`theme-${themeName}`);
+                    // Save theme preference to localStorage
+                    localStorage.setItem('funnyStory_theme', themeName);
+                }
+
+                /**
+                 * Toggles the disabled state and visibility of the main consequence select dropdown.
+                 */
+                function toggleConsequenceDropdown() {
+                    consequenceSelect.disabled = !consequenceToggle.checked;
+                    consequenceSelectContainer.classList.toggle('hidden', !consequenceToggle.checked);
+                    generateStory(); // Regenerate story when toggle changes
+                }
+
+                /**
+                 * Checks all randomize checkboxes.
+                 */
+                function checkAllRandomizeCheckboxes() {
+                    randomizeCharacter.checked = true;
+                    randomizeAction.checked = true;
+                    randomizeObject.checked = true;
+                    randomizeLocation.checked = true;
+                    randomizeConsequence.checked = true;
+                }
+
+                /**
+                 * Unchecks all randomize checkboxes.
+                 */
+                function uncheckAllRandomizeCheckboxes() {
+                    randomizeCharacter.checked = false;
+                    randomizeAction.checked = false;
+                    randomizeObject.checked = false;
+                    randomizeLocation.checked = false;
+                    randomizeConsequence.checked = false;
+                }
+
+                // Listen for auth state changes to get the user ID
+                onAuthStateChanged(auth, (user) => {
+                    if (user) {
+                        userId = user.uid;
+                        document.getElementById('userIdDisplay').textContent = `User ID: ${userId}`;
+                        // Now that auth is ready, initialize dropdowns and render saved stories
+                        initializeDropdowns();
+                        generateStory();
+                        renderSavedStories();
+                    } else {
+                        // User is signed out or anonymous
+                        userId = crypto.randomUUID(); // Use a random UUID for unauthenticated users
+                        document.getElementById('userIdDisplay').textContent = `User ID: ${userId} (Anonymous)`;
+                        initializeDropdowns();
+                        generateStory();
+                        renderSavedStories();
+                    }
+                });
+
+                // --- Event Listeners ---
+                // Initial setup for main dropdowns
+                function initializeDropdowns() {
+                    populateSelect(characterSelect, loadOptions('characters'));
+                    populateSelect(actionSelect, loadOptions('actions'));
+                    populateSelect(objectSelect, loadOptions('objects'));
+                    populateSelect(locationSelect, loadOptions('locations'));
+                    populateSelect(consequenceSelect, loadOptions('consequences'));
+                }
+
+                randomizeBtn.addEventListener('click', randomizeValues);
+                copyStoryBtn.addEventListener('click', copyStoryToClipboard);
+                saveStoryBtn.addEventListener('click', saveCurrentStory);
+                addPartBtn.addEventListener('click', () => addPart()); // Add new part on button click
+
+                // All On / All Off buttons
+                allOnBtn.addEventListener('click', checkAllRandomizeCheckboxes);
+                allOffBtn.addEventListener('click', uncheckAllRandomizeCheckboxes);
+
+                // Automatic story regeneration on main dropdown change
+                characterSelect.addEventListener('change', generateStory);
+                actionSelect.addEventListener('change', generateStory);
+                objectSelect.addEventListener('change', generateStory);
+                locationSelect.addEventListener('change', generateStory);
+                consequenceSelect.addEventListener('change', generateStory);
+
+                // Main consequence toggle checkbox event listener
+                consequenceToggle.addEventListener('change', toggleConsequenceDropdown);
+
+                // Theme switcher event listener
+                themeSwitcher.addEventListener('change', (event) => {
+                    applyTheme(event.target.value);
+                });
+
+                // Initial setup on page load (after Firebase is ready)
+                // Load and apply theme preference
+                const savedTheme = localStorage.getItem('funnyStory_theme') || 'default';
+                applyTheme(savedTheme);
+                themeSwitcher.value = savedTheme; // Set dropdown to current theme
+
+                // Set initial state of main consequence toggle and dropdown
+                const savedConsequenceState = localStorage.getItem('funnyStory_consequenceEnabled');
+                consequenceToggle.checked = savedConsequenceState === 'true'; // Default to false if not found
+                toggleConsequenceDropdown(); // Apply initial state
+
+            } catch (error) {
+                console.error("Error initializing Firebase or authenticating:", error);
+                // Fallback if Firebase fails (e.g., continue with local storage if desired, or show error)
+                document.getElementById('storyOutput').textContent = "Error loading app. Please try again.";
+            }
+        };
+    </script>
+    <style>
+        /* Custom font for a friendly look */
+        body {
+            font-family: 'Inter', sans-serif;
+            transition: background-color 0.5s ease; /* Smooth transition for background */
+        }
+
+        /* Base theme (Default) */
+        .theme-default {
+            background: linear-gradient(to bottom right, #a78bfa, #ec4899, #ef4444); /* purple-400, pink-500, red-500 */
+        }
+        .theme-default .card-character { background-color: #dbeafe; /* blue-100 */ }
+        .theme-default .card-action { background-color: #ede9fe; /* purple-100 */ }
+        .theme-default .card-object { background-color: #dcfce7; /* green-100 */ }
+        .theme-default .card-location { background-color: #fef9c3; /* yellow-100 */ }
+        .theme-default .card-consequence { background-color: #ffe4e6; /* rose-100 */ }
+        .theme-default .dynamic-part-card { background-color: #ffffff; border-color: #e5e7eb; } /* White background for dynamic part card */
+
+        .theme-default .text-blue-800 { color: #1e40af; }
+        .theme-default .text-purple-800 { color: #5b21b6; }
+        .theme-default .text-green-800 { color: #166534; }
+        .theme-default .text-yellow-800 { color: #a16207; }
+        .theme-default .text-rose-800 { color: #9f1239; }
+
+        .theme-default .border-blue-300 { border-color: #93c5fd; }
+        .theme-default .border-purple-300 { border-color: #c4b5fd; }
+        .theme-default .border-green-300 { border-color: #86efad; }
+        .theme-default .border-yellow-300 { border-color: #fde047; }
+        .theme-default .border-rose-300 { border-color: #fda4af; }
+
+        .theme-default .focus\:ring-blue-500:focus { --tw-ring-color: #3b82f6; }
+        .theme-default .focus\:ring-purple-500:focus { --tw-ring-color: #a855f7; }
+        .theme-default .focus\:ring-green-500:focus { --tw-ring-color: #22c55e; }
+        .theme-default .focus\:ring-yellow-500:focus { --tw-ring-color: #eab308; }
+        .theme-default .focus\:ring-rose-500:focus { --tw-ring-color: #f43f5e; }
+
+        .theme-default .bg-white { background-color: #ffffff; }
+        .theme-default .bg-gray-50 { background-color: #f9fafb; }
+        .theme-default .bg-gray-100 { background-color: #f3f4f6; }
+        .theme-default .text-gray-800 { color: #1f2937; }
+        .theme-default .text-gray-600 { color: #4b5563; }
+        .theme-default .text-gray-500 { color: #6b7280; }
+
+
+        /* Dark theme */
+        .theme-dark {
+            background: linear-gradient(to bottom right, #1f2937, #111827, #000000); /* Darker gradient */
+        }
+        .theme-dark .card-character,
+        .theme-dark .card-action,
+        .theme-dark .card-object,
+        .theme-dark .card-location,
+        .theme-dark .card-consequence,
+        .theme-dark .dynamic-part-card { /* Apply dark theme to new card */
+            background-color: #374151; /* Darker card background */
+            color: #d1d5db; /* Lighter text for dark background */
+        }
+        .theme-dark .text-blue-800,
+        .theme-dark .text-purple-800,
+        .theme-dark .text-green-800,
+        .theme-dark .text-yellow-800,
+        .theme-dark .text-rose-800 { /* Apply dark theme to new card text */
+            color: #9ca3af; /* Lighter headings */
+        }
+        .theme-dark .border-blue-300,
+        .theme-dark .border-purple-300,
+        .theme-dark .border-green-300,
+        .theme-dark .border-yellow-300,
+        .theme-dark .border-rose-300 { /* Apply dark theme to new card border */
+            border-color: #4b5563; /* Darker borders */
+        }
+        .theme-dark .focus\:ring-blue-500:focus,
+        .theme-dark .focus\:ring-purple-500:focus,
+        .theme-dark .focus\:ring-green-500:focus,
+        .theme-dark .focus\:ring-yellow-500:focus,
+        .theme-dark .focus\:ring-rose-500:focus { /* Apply dark theme to new card ring */
+            --tw-ring-color: #6b7280; /* Lighter ring on focus */
+        }
+        .theme-dark .bg-white { background-color: #1f2937; } /* Darker main container */
+        .theme-dark .bg-gray-50 { background-color: #374151; } /* Darker story output */
+        .theme-dark .bg-gray-100 { background-color: #374151; } /* Darker saved stories container */
+        .theme-dark .text-gray-800,
+        .theme-dark .text-gray-600,
+        .theme-dark .text-gray-500 {
+            color: #d1d5db; /* Lighter general text */
+        }
+        .theme-dark select,
+        .theme-dark input[type="text"],
+        .theme-dark input[type="checkbox"] { /* Added input[type="text"] for consistency */
+            background-color: #4b5563; /* Darker input/select background */
+            color: #d1d5db; /* Lighter input/select text */
+        }
+        .theme-dark option {
+            background-color: #4b5563; /* Darker option background */
+            color: #d1d5db; /* Lighter option text */
+        }
+        .theme-dark .bg-indigo-600 { background-color: #4f46e5; } /* Adjust button colors for dark mode */
+        .theme-dark .hover\:bg-indigo-700:hover { background-color: #4338ca; }
+        .theme-dark .bg-teal-600 { background-color: #0d9488; }
+        .theme-dark .hover\:bg-teal-700:hover { background-color: #0f766e; }
+        .theme-dark .bg-gray-600 { background-color: #4b5563; }
+        .theme-dark .hover\:bg-gray-700:hover { background-color: #374151; }
+        .theme-dark .bg-blue-500 { background-color: #3b82f6; } /* Load button */
+        .theme-dark .hover\:bg-blue-600:hover { background-color: #2563eb; }
+        .theme-dark .bg-red-500 { background-color: #ef4444; } /* Delete button */
+        .theme-dark .hover\:bg-red-600:hover { background-color: #dc2626; }
+        .theme-dark .copied-message { background-color: #16a34a; /* green-600 for dark mode feedback */ }
+        .theme-dark .bg-purple-600 { background-color: #9333ea; } /* Add Part button */
+        .theme-dark .hover\:bg-purple-700:hover { background-color: #7e22ce; }
+
+        /* Story Output Animation */
+        .story-fade-transition {
+            transition: opacity 0.3s ease-in-out;
+        }
+        .story-fade-out {
+            opacity: 0;
+        }
+        .story-fade-in {
+            opacity: 1;
+        }
+
+        /* Collapsible content transition */
+        .part-content {
+            transition: max-height 0.3s ease-out, opacity 0.3s ease-out;
+            overflow: hidden;
+            max-height: 0;
+            opacity: 0;
+        }
+        .part-content.expanded {
+            max-height: 500px; /* Max height to allow transition, adjust as needed */
+            opacity: 1;
+        }
+        .toggle-part-btn.rotated {
+            transform: rotate(180deg);
+        }
+
+        /* Specific styling for select elements to try and constrain width */
+        select {
+            /* Ensures the select box itself respects its container's width */
+            max-width: 100%;
+            /* These properties might help with long text *within* the selected option display,
+               but usually do not affect the opened dropdown list's width directly,
+               as that is often rendered natively by the browser/OS. */
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-4 theme-default">
+    <div class="container mx-auto max-w-4xl bg-white bg-opacity-90 rounded-2xl shadow-xl p-8">
+        <header class="text-center mb-10">
+            <h1 class="text-5xl font-extrabold text-gray-800 mb-4">Funny Story</h1>
+            <p class="text-xl text-gray-600">Create hilarious sentences!</p>
+            <div class="mt-4 flex justify-center items-center space-x-2">
+                <label for="themeSwitcher" class="text-gray-600">Theme:</label>
+                <select id="themeSwitcher" class="p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none bg-white text-gray-800">
+                    <option value="default">Default</option>
+                    <option value="dark">Dark</option>
+                </select>
+            </div>
+            <p id="userIdDisplay" class="text-xs text-gray-500 mt-2">User ID: Loading...</p>
+        </header>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
+            <!-- Character Card -->
+            <div class="card-character p-6 rounded-xl shadow-lg transform transition-transform duration-300 hover:scale-105 hover:shadow-2xl flex flex-col items-center text-center">
+                <div class="text-6xl mb-4" role="img" aria-label="Character Icon">
+                    &#129497; <!-- Emoji for character (person shrugging) -->
+                </div>
+                <h2 class="text-3xl font-bold text-blue-800 mb-3">Character</h2>
+                <p class="text-gray-700 leading-relaxed">Who is the star of your story?</p>
+                <div class="mt-4 w-full">
+                    <select id="characterSelect" class="w-full p-3 border border-blue-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none">
+                        <!-- Options will be populated by JavaScript -->
+                    </select>
+                </div>
+            </div>
+
+            <!-- Action Card -->
+            <div class="card-action p-6 rounded-xl shadow-lg transform transition-transform duration-300 hover:scale-105 hover:shadow-2xl flex flex-col items-center text-center">
+                <div class="text-6xl mb-4" role="img" aria-label="Action Icon">
+                    &#128172; <!-- Emoji for action (speech balloon) -->
+                </div>
+                <h2 class="text-3xl font-bold text-purple-800 mb-3">Action</h2>
+                <p class="text-gray-700 leading-relaxed">What are they doing?</p>
+                <div class="mt-4 w-full">
+                    <select id="actionSelect" class="w-full p-3 border border-purple-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none">
+                        <!-- Options will be populated by JavaScript -->
+                    </select>
+                </div>
+            </div>
+
+            <!-- Object Card -->
+            <div class="card-object p-6 rounded-xl shadow-lg transform transition-transform duration-300 hover:scale-105 hover:shadow-2xl flex flex-col items-center text-center">
+                <div class="text-6xl mb-4" role="img" aria-label="Object Icon">
+                    &#128161; <!-- Emoji for object (light bulb) -->
+                </div>
+                <h2 class="text-3xl font-bold text-green-800 mb-3">Object</h2>
+                <p class="text-gray-700 leading-relaxed">What unusual item is involved?</p>
+                <div class="mt-4 w-full">
+                    <select id="objectSelect" class="w-full p-3 border border-green-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none">
+                        <!-- Options will be populated by JavaScript -->
+                    </select>
+                </div>
+            </div>
+
+            <!-- Location Card -->
+            <div class="card-location p-6 rounded-xl shadow-lg transform transition-transform duration-300 hover:scale-105 hover:hover:shadow-2xl flex flex-col items-center text-center">
+                <div class="text-6xl mb-4" role="img" aria-label="Location Icon">
+                    &#127757; <!-- Emoji for location (earth globe) -->
+                </div>
+                <h2 class="text-3xl font-bold text-yellow-800 mb-3">Location</h2>
+                <p class="text-gray-700 leading-relaxed">Where does the absurdity unfold?</p>
+                <div class="mt-4 w-full">
+                    <select id="locationSelect" class="w-full p-3 border border-yellow-300 rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-transparent outline-none">
+                        <!-- Options will be populated by JavaScript -->
+                    </select>
+                </div>
+            </div>
+
+            <!-- Consequence Card (New) -->
+            <div class="card-consequence p-6 rounded-xl shadow-lg transform transition-transform duration-300 hover:scale-105 hover:shadow-2xl flex flex-col items-center text-center col-span-1 md:col-span-2">
+                <div class="text-6xl mb-4" role="img" aria-label="Consequence Icon">
+                    &#128165; <!-- Emoji for consequence (boom) -->
+                </div>
+                <h2 class="text-3xl font-bold text-rose-800 mb-3">Consequence</h2>
+                <p class="text-gray-700 leading-relaxed mb-4">Add a funny outcome to the story?</p>
+                <div class="flex items-center mb-4">
+                    <input type="checkbox" id="consequenceToggle" class="mr-2 h-5 w-5 text-rose-600 rounded focus:ring-rose-500">
+                    <label for="consequenceToggle" class="text-gray-700 font-medium">Enable Consequence</label>
+                </div>
+                <div class="mt-4 w-full" id="consequenceSelectContainer">
+                    <select id="consequenceSelect" class="w-full p-3 border border-rose-300 rounded-lg focus:ring-2 focus:ring-rose-500 focus:border-transparent outline-none" disabled>
+                        <!-- Options will be populated by JavaScript -->
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <!-- New section for Additional Parts -->
+        <div class="mt-10 p-6 bg-gray-100 rounded-xl shadow-inner">
+            <h2 class="text-3xl font-bold text-gray-800 mb-4 text-center">Add More to Your Story!</h2>
+            <div id="additionalPartsContainer" class="space-y-6 mb-6">
+                <!-- Dynamic parts will be added here by JavaScript -->
+            </div>
+            <div class="flex justify-center">
+                <button id="addPartBtn" class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-6 rounded-full shadow-lg transition-all duration-300 transform hover:scale-105 focus:outline-none focus:ring-4 focus:ring-purple-500 focus:ring-opacity-50">
+                    Add New Part
+                </button>
+            </div>
+        </div>
+
+        <!-- Randomize Options Section -->
+        <div class="bg-gray-100 p-6 rounded-xl shadow-inner mt-8 text-center">
+            <h2 class="text-2xl font-bold text-gray-800 mb-4">Randomize Options</h2>
+            <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-6">
+                <div class="flex items-center justify-center">
+                    <input type="checkbox" id="randomizeCharacter" class="mr-2 h-5 w-5 text-blue-600 rounded focus:ring-blue-500" checked>
+                    <label for="randomizeCharacter" class="text-gray-700 font-medium">Character</label>
+                </div>
+                <div class="flex items-center justify-center">
+                    <input type="checkbox" id="randomizeAction" class="mr-2 h-5 w-5 text-purple-600 rounded focus:ring-purple-500" checked>
+                    <label for="randomizeAction" class="text-gray-700 font-medium">Action</label>
+                </div>
+                <div class="flex items-center justify-center">
+                    <input type="checkbox" id="randomizeObject" class="mr-2 h-5 w-5 text-green-600 rounded focus:ring-green-500" checked>
+                    <label for="randomizeObject" class="text-gray-700 font-medium">Object</label>
+                </div>
+                <div class="flex items-center justify-center">
+                    <input type="checkbox" id="randomizeLocation" class="mr-2 h-5 w-5 text-yellow-600 rounded focus:ring-yellow-500" checked>
+                    <label for="randomizeLocation" class="text-gray-700 font-medium">Location</label>
+                </div>
+                <div class="flex items-center justify-center">
+                    <input type="checkbox" id="randomizeConsequence" class="mr-2 h-5 w-5 text-rose-600 rounded focus:ring-rose-500" checked>
+                    <label for="randomizeConsequence" class="text-gray-700 font-medium">Consequence</label>
+                </div>
+            </div>
+            <div class="flex justify-center gap-4 mb-6">
+                <button id="allOnBtn" class="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-5 rounded-full shadow-lg transition-all duration-300 transform hover:scale-105 focus:outline-none focus:ring-4 focus:ring-green-500 focus:ring-opacity-50">
+                    All On
+                </button>
+                <button id="allOffBtn" class="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-5 rounded-full shadow-lg transition-all duration-300 transform hover:scale-105 focus:outline-none focus:ring-4 focus:ring-red-500 focus:ring-opacity-50">
+                    All Off
+                </button>
+            </div>
+            <button id="randomizeBtn" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 px-6 rounded-full shadow-lg transition-all duration-300 transform hover:scale-105 focus:outline-none focus:ring-4 focus:ring-gray-500 focus:ring-opacity-50">
+                Randomize
+            </button>
+        </div>
+
+        <!-- Story Display Area -->
+        <div id="storyOutput" class="mt-10 p-6 bg-gray-50 rounded-xl shadow-inner text-center text-gray-800 text-xl italic min-h-[100px] flex items-center justify-center story-fade-transition">
+            Your funny story will appear here!
+        </div>
+
+        <!-- Other Action Buttons -->
+        <div class="flex flex-col sm:flex-row justify-center gap-4 mt-8">
+            <button id="copyStoryBtn" class="bg-teal-600 hover:bg-teal-700 text-white font-bold py-3 px-6 rounded-full shadow-lg transition-all duration-300 transform hover:scale-105 focus:outline-none focus:ring-4 focus:ring-teal-500 focus:ring-opacity-50">
+                Copy Sentence
+            </button>
+            <button id="saveStoryBtn" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-6 rounded-full shadow-lg transition-all duration-300 transform hover:scale-105 focus:outline-none focus:ring-4 focus:ring-indigo-500 focus:ring-opacity-50">
+                Save Story
+            </button>
+        </div>
+
+        <!-- Saved Stories Section -->
+        <div class="mt-10">
+            <h2 class="text-3xl font-bold text-gray-800 mb-4 text-center">My Saved Stories</h2>
+            <div id="savedStoriesContainer" class="bg-gray-100 p-6 rounded-xl shadow-inner max-h-96 overflow-y-auto">
+                <p id="noSavedStoriesMessage" class="text-gray-500 text-center italic">No stories saved yet. Save one above!</p>
+                <!-- Saved stories will be dynamically added here -->
+            </div>
+        </div>
+
+        <footer class="text-center mt-10 text-gray-600 text-sm">
+            <p>&copy; 2025 Funny Story. All rights reserved.</p>
+        </footer>
+    </div>
+</body>
+</html>
