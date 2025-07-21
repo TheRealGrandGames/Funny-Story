@@ -14,7 +14,17 @@
 
         // Global Firebase variables - MUST BE USED
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+        // IMPORTANT: If running this on GitHub Pages or locally, you MUST replace the placeholder
+        // firebaseConfig with your actual Firebase project configuration.
+        // You can find this in your Firebase project settings -> Project settings -> Your apps -> Firebase SDK snippet -> Config.
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {
+            apiKey: "YOUR_API_KEY",
+            authDomain: "YOUR_AUTH_DOMAIN",
+            projectId: "YOUR_PROJECT_ID", // This is crucial for Firebase initialization
+            storageBucket: "YOUR_STORAGE_BUCKET",
+            messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+            appId: "YOUR_APP_ID"
+        };
         const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
 
         let app;
@@ -78,7 +88,7 @@
                 "Their voice turned into a kazoo sound.",
                 "A portal to a dimension of sentient cheese opened.",
                 "They were bald with no hair shortly after.",
-                "They flew to a nearby house.", /* Added comma here */
+                "They flew to a nearby house.",
                 "They, shortly after, fell into the underworld."
             ],
             partTypes: [
